@@ -13,7 +13,7 @@ import { CartProvider } from "./context/CartContext";
 import { getApiErrorMessage, isRetryableApiError } from "./lib/http";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import Index from "./pages";
+import Index from "./pages/Index";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";

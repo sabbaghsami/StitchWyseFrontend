@@ -1,65 +1,117 @@
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { useState } from "react";
+import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { toast } from "../components/ui/use-toast";
+import { createStripeCheckoutSession } from "../lib/checkout";
 
 const Cart = () => {
-  const { items, updateQuantity, removeFromCart, totalPrice } = useCart();
+  const { items, removeFromCart, totalPrice, updateQuantity } = useCart();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  const handleCheckout = async () => {
+    if (isCheckingOut) {
+      return;
+    }
+
+    const missingStripeIds = items.filter((item) => !item.product.stripeProductId);
+    if (missingStripeIds.length > 0) {
+      toast({
+        title: "Checkout unavailable",
+        description: "Some products are missing Stripe product IDs. Please update products in Supabase.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsCheckingOut(true);
+      const checkoutUrl = await createStripeCheckoutSession(items);
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to start checkout.";
+      toast({
+        title: "Checkout failed",
+        description: message,
+        variant: "destructive",
+      });
+      setIsCheckingOut(false);
+    }
+  };
 
   if (items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-20 text-center">
-        <ShoppingBag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-        <h1 className="font-display text-2xl font-bold mb-2">Your cart is empty</h1>
-        <p className="text-muted-foreground mb-6">Browse our collection and add something you love.</p>
-        <Link to="/products" className="inline-flex bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-opacity">
-          Shop Now
+      <div className="container mx-auto px-4 py-24 text-center md:px-8">
+        <ShoppingBag className="mx-auto mb-5 h-10 w-10 text-muted-foreground" />
+        <h1 className="text-3xl font-semibold uppercase tracking-[0.05em] text-foreground md:text-4xl">
+          Your Cart Is Empty
+        </h1>
+        <p className="mx-auto mt-4 max-w-md text-sm uppercase tracking-[0.1em] text-muted-foreground">
+          Browse the latest drop and add your next beanie.
+        </p>
+        <Link to="/products" className="button-black mt-8">
+          SHOP NOW
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-3xl">
-      <h1 className="font-display text-3xl font-bold mb-8">Your Cart</h1>
+    <div className="container mx-auto px-4 py-16 md:px-8 md:py-20">
+      <h1 className="text-4xl font-semibold uppercase tracking-[0.05em] text-foreground md:text-5xl">Cart</h1>
 
-      <div className="space-y-4">
-        {items.map(({ product, quantity }) => (
-          <div key={product.id} className="flex gap-4 p-4 bg-card rounded-lg border border-border">
-            <img src={product.images[0]} alt={product.name} className="w-20 h-20 rounded-md object-cover" />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-display font-semibold text-foreground truncate">{product.name}</h3>
-              <p className="text-sm text-muted-foreground capitalize">{product.category}</p>
-              <p className="text-sm font-semibold text-primary mt-1">£{product.price.toFixed(2)}</p>
-            </div>
-            <div className="flex flex-col items-end justify-between">
-              <button onClick={() => removeFromCart(product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-2">
-                <button onClick={() => updateQuantity(product.id, quantity - 1)} className="w-7 h-7 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
-                  <Minus className="w-3 h-3" />
-                </button>
-                <span className="text-sm font-medium w-6 text-center">{quantity}</span>
-                <button onClick={() => updateQuantity(product.id, quantity + 1)} className="w-7 h-7 rounded-md bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
-                  <Plus className="w-3 h-3" />
-                </button>
+      <div className="mt-10 grid gap-8 lg:grid-cols-[1.6fr,1fr]">
+        <div className="space-y-5">
+          {items.map(({ product, quantity }) => (
+            <article key={product.id} className="flex gap-4 border border-border bg-card p-4 md:p-5">
+              <img src={product.images[0]} alt={product.name} className="h-24 w-20 object-cover md:h-28 md:w-24" />
+
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium uppercase tracking-[0.08em] text-foreground">{product.name}</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">£{product.price.toFixed(2)}</p>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    onClick={() => updateQuantity(product.id, quantity - 1)}
+                    className="inline-flex h-7 w-7 items-center justify-center border border-border text-foreground transition-colors hover:border-foreground"
+                    aria-label={`Decrease quantity for ${product.name}`}
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="w-4 text-center text-sm">{quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(product.id, quantity + 1)}
+                    className="inline-flex h-7 w-7 items-center justify-center border border-border text-foreground transition-colors hover:border-foreground"
+                    aria-label={`Increase quantity for ${product.name}`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
 
-      <div className="mt-8 p-6 bg-card rounded-lg border border-border">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-lg font-display font-semibold">Total</span>
-          <span className="text-2xl font-bold text-primary">£{totalPrice.toFixed(2)}</span>
+              <button
+                onClick={() => removeFromCart(product.id)}
+                className="self-start text-muted-foreground transition-colors hover:text-foreground"
+                aria-label={`Remove ${product.name} from cart`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </article>
+          ))}
         </div>
-        <button className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:opacity-90 transition-opacity">
-          Proceed to Checkout
-        </button>
-        <p className="text-xs text-muted-foreground text-center mt-3">
-          You'll be redirected to Stripe for secure payment.
-        </p>
+
+        <aside className="h-fit border border-border bg-card p-6 lg:sticky lg:top-24">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Subtotal</span>
+            <span className="text-2xl font-semibold text-foreground">£{totalPrice.toFixed(2)}</span>
+          </div>
+          <button className="button-black mt-6 w-full disabled:cursor-not-allowed disabled:opacity-60" onClick={handleCheckout} disabled={isCheckingOut}>
+            {isCheckingOut ? "Redirecting..." : "Proceed to Checkout"}
+          </button>
+          <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            Secure checkout powered by Stripe.
+          </p>
+        </aside>
       </div>
     </div>
   );

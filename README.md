@@ -48,6 +48,27 @@ bun run dev
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
 
+### Supabase Configuration
+
+Set these variables in your local `.env`:
+
+```bash
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxxx
+```
+
+When configured, product data is loaded from Supabase tables (`products`, `product_images`).
+When missing, the app falls back to static seed data in `/src/data/products.ts`.
+
+### Stripe Checkout (Supabase Edge Function)
+
+- Edge function deployed: `create-checkout-session`
+- Product table must use `products.stripe_product_id` with Stripe Product IDs (for example, `prod_...`).
+- For each Stripe product, keep at least one active Stripe Price.
+- Configure Supabase Edge Function secrets:
+  - `STRIPE_SECRET_KEY`
+  - `ALLOWED_ORIGINS` (comma-separated, e.g. `https://stitchwyse.com,https://www.stitchwyse.com`)
+
 For LAN testing only, run:
 
 ```bash

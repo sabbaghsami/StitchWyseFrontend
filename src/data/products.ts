@@ -7,6 +7,7 @@ export interface Product {
   price: number;
   summary: string;
   images: string[];
+  stripeProductId?: string;
   featured?: boolean;
 }
 
@@ -24,6 +25,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=600&h=600&fit=crop",
     ],
     featured: true,
+    stripeProductId: "prod_U2lNJLuFnXBXJR",
   },
   {
     id: "beanie-dusty-blue",
@@ -37,18 +39,20 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1510598969022-c4c6c5d05769?w=600&h=600&fit=crop",
     ],
     featured: true,
+    stripeProductId: "prod_U2lNxQZpQXVQvt",
   },
   {
     id: "beanie-cream",
     name: "Cream Cable Knit Beanie",
     category: "beanies",
-    price: 32,
+    price: 30,
     summary: "Classic cable-knit pattern in creamy white. A timeless piece that pairs with everything.",
     images: [
       "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=600&h=600&fit=crop",
       "https://images.unsplash.com/photo-1529958030586-3aae4ca485ff?w=600&h=600&fit=crop",
       "https://images.unsplash.com/photo-1576871337632-b9aef4c17ab9?w=600&h=600&fit=crop",
     ],
+    stripeProductId: "prod_U2lNk0T515ZRds",
   },
   {
     id: "scarf-blue-cable",
@@ -62,6 +66,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1601924921557-45e8e0b8587e?w=600&h=600&fit=crop",
     ],
     featured: true,
+    stripeProductId: "prod_U2lNfdkbL5FkWh",
   },
   {
     id: "scarf-sunset",
@@ -74,6 +79,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1457545195570-67f207084966?w=600&h=600&fit=crop",
       "https://images.unsplash.com/photo-1601924921557-45e8e0b8587e?w=600&h=600&fit=crop",
     ],
+    stripeProductId: "prod_U2lNysZDEJTS5u",
   },
   {
     id: "scarf-cream-infinity",
@@ -86,6 +92,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=600&h=600&fit=crop",
       "https://images.unsplash.com/photo-1457545195570-67f207084966?w=600&h=600&fit=crop",
     ],
+    stripeProductId: "prod_U2lNkTCClsCdg0",
   },
   {
     id: "scrunchie-rust",
@@ -99,6 +106,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=600&fit=crop",
     ],
     featured: true,
+    stripeProductId: "prod_U2lNjbX3JHUAkp",
   },
   {
     id: "scrunchie-blue",
@@ -111,6 +119,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1598522325074-042db73aa4e6?w=600&h=600&fit=crop",
       "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=600&fit=crop",
     ],
+    stripeProductId: "prod_U2lNjl8RMbOt8g",
   },
   {
     id: "scrunchie-set",
@@ -123,6 +132,7 @@ export const products: Product[] = [
       "https://images.unsplash.com/photo-1598522325074-042db73aa4e6?w=600&h=600&fit=crop",
       "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=600&h=600&fit=crop",
     ],
+    stripeProductId: "prod_U2lO4EODEjl60S",
   },
 ];
 

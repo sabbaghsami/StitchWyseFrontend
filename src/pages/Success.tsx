@@ -1,8 +1,39 @@
-import { Link } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
+import { useCart } from "../context/CartContext";
+
+const LAST_CLEARED_SESSION_KEY = "stitchwyse.checkout.lastClearedSessionId";
 
 const Success = () => {
-  const orderNumber = `SW-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  const [searchParams] = useSearchParams();
+  const { clearCart } = useCart();
+  const sessionId = searchParams.get("session_id")?.trim() ?? "";
+
+  useEffect(() => {
+    if (!sessionId) {
+      return;
+    }
+
+    try {
+      const lastClearedSessionId = window.sessionStorage.getItem(LAST_CLEARED_SESSION_KEY);
+      if (lastClearedSessionId === sessionId) {
+        return;
+      }
+
+      clearCart();
+      window.sessionStorage.setItem(LAST_CLEARED_SESSION_KEY, sessionId);
+    } catch {
+      clearCart();
+    }
+  }, [clearCart, sessionId]);
+
+  const orderNumber = useMemo(() => {
+    if (sessionId) {
+      return `SW-${sessionId.slice(-8).toUpperCase()}`;
+    }
+    return `SW-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  }, [sessionId]);
 
   return (
     <div className="container mx-auto px-4 py-20 text-center max-w-lg">

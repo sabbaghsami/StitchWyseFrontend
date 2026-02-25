@@ -163,6 +163,9 @@ const Navbar = () => {
                             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                               £{product.price.toFixed(2)}
                             </p>
+                            <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                              {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : "Out of stock"}
+                            </p>
                             <div className="mt-3 flex items-center gap-3">
                               <button
                                 onClick={() => updateQuantity(product.id, quantity - 1)}
@@ -174,7 +177,8 @@ const Navbar = () => {
                               <span className="w-4 text-center text-sm">{quantity}</span>
                               <button
                                 onClick={() => updateQuantity(product.id, quantity + 1)}
-                                className="inline-flex h-7 w-7 items-center justify-center border border-border text-foreground transition-colors hover:border-foreground"
+                                disabled={quantity >= product.stockQuantity}
+                                className="inline-flex h-7 w-7 items-center justify-center border border-border text-foreground transition-colors hover:border-foreground disabled:cursor-not-allowed disabled:opacity-40"
                                 aria-label={`Increase quantity for ${product.name}`}
                               >
                                 <Plus className="h-3.5 w-3.5" />

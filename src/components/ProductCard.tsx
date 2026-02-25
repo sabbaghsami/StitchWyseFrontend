@@ -11,6 +11,11 @@ const ProductCard = ({ product }: ProductCardProps) => {
   return (
     <Link to={`/products/${product.id}`} className="group block">
       <div className="relative mb-4 aspect-[4/5] overflow-hidden bg-muted">
+        {product.stockQuantity < 1 && (
+          <span className="absolute left-2 top-2 z-10 bg-background/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground">
+            Sold out
+          </span>
+        )}
         <img
           src={product.images[0]}
           alt={product.name}

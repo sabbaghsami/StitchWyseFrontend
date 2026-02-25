@@ -17,10 +17,12 @@ E-commerce storefront for handmade crochet products with Supabase-backed catalog
 ## Architecture Notes (Important)
 
 - `public.products.stripe_product_id` must store Stripe Product IDs (`prod_...`), not Stripe Price IDs.
+- `public.products.stock_quantity` tracks remaining inventory.
 - Checkout accepts cart items as `productId` + `quantity` only.
 - The edge function resolves the active Stripe Price from `stripe_product_id` server-side.
 - The frontend never sends trusted price values to Stripe.
 - Each active product should have exactly one active GBP Stripe Price.
+- Stock is reserved in Supabase when a checkout session is created.
 
 ## Environment Variables
 
@@ -52,9 +54,10 @@ Without `STRIPE_SECRET_KEY`, checkout session creation fails.
 
 1. Create Stripe Products and keep one active GBP price per product.
 2. Sync each Supabase product row to a Stripe Product ID in `products.stripe_product_id`.
-3. Enable Stripe customer emails (receipts) in Dashboard:
+3. Maintain `products.stock_quantity` values for available inventory.
+4. Enable Stripe customer emails (receipts) in Dashboard:
    - Settings -> Emails -> Successful payments.
-4. Configure Stripe branding (logo/colors) if needed:
+5. Configure Stripe branding (logo/colors) if needed:
    - Settings -> Branding.
 
 ### Receipt Email Behavior

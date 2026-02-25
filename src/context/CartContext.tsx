@@ -26,11 +26,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function sanitizeQuantity(quantity: number): number {
+function getMaxAllowedQuantity(product: Product): number {
+  if (!Number.isInteger(product.stockQuantity) || product.stockQuantity < 1) {
+    return 0;
+  }
+
+  return Math.min(product.stockQuantity, MAX_QUANTITY_PER_PRODUCT);
+}
+
+function sanitizeQuantity(quantity: number, maxAllowed: number): number {
+  if (maxAllowed < 1) {
+    return 0;
+  }
   if (!Number.isInteger(quantity) || quantity < 1) {
     return 1;
   }
-  return Math.min(quantity, MAX_QUANTITY_PER_PRODUCT);
+  return Math.min(quantity, maxAllowed);
 }
 
 function isValidProduct(value: unknown): value is Product {
@@ -46,6 +57,7 @@ function isValidProduct(value: unknown): value is Product {
   const images = value.images;
   const featured = value.featured;
   const stripeProductId = value.stripeProductId;
+  const stockQuantity = value.stockQuantity;
 
   if (typeof id !== "string" || !id.trim()) {
     return false;
@@ -57,6 +69,9 @@ function isValidProduct(value: unknown): value is Product {
     return false;
   }
   if (typeof price !== "number" || Number.isNaN(price) || price < 0) {
+    return false;
+  }
+  if (!Number.isInteger(stockQuantity) || stockQuantity < 0) {
     return false;
   }
   if (typeof summary !== "string" || !summary.trim()) {
@@ -88,10 +103,18 @@ function normalizePersistedItems(rawItems: unknown): CartItem[] {
       continue;
     }
 
-    const quantity = sanitizeQuantity(Number(rawItem.quantity));
+    const maxAllowed = getMaxAllowedQuantity(rawItem.product);
+    if (maxAllowed < 1) {
+      continue;
+    }
+
+    const quantity = sanitizeQuantity(Number(rawItem.quantity), maxAllowed);
+    if (quantity < 1) {
+      continue;
+    }
     const productId = rawItem.product.id;
     const previousQuantity = quantityByProductId.get(productId) ?? 0;
-    quantityByProductId.set(productId, Math.min(previousQuantity + quantity, MAX_QUANTITY_PER_PRODUCT));
+    quantityByProductId.set(productId, Math.min(previousQuantity + quantity, maxAllowed));
     productById.set(productId, rawItem.product);
   }
 
@@ -138,11 +161,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = useCallback((product: Product) => {
     setItems((prev) => {
+      const maxAllowed = getMaxAllowedQuantity(product);
+      if (maxAllowed < 1) {
+        return prev;
+      }
+
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
         return prev.map((i) =>
           i.product.id === product.id
-            ? { ...i, quantity: Math.min(i.quantity + 1, MAX_QUANTITY_PER_PRODUCT) }
+            ? { ...i, quantity: Math.min(i.quantity + 1, maxAllowed) }
             : i
         );
       }
@@ -161,9 +189,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setItems((prev) =>
         prev.map((i) =>
           i.product.id === productId
-            ? { ...i, quantity: sanitizeQuantity(quantity) }
+            ? {
+                ...i,
+                quantity: sanitizeQuantity(quantity, getMaxAllowedQuantity(i.product)),
+              }
             : i
         )
+        .filter((item) => item.quantity > 0)
       );
     }
   }, []);

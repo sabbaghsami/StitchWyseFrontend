@@ -42,6 +42,10 @@ const ProductDetail = () => {
   }
 
   const handleAddToCart = () => {
+    if (product.stockQuantity < 1) {
+      return;
+    }
+
     addToCart(product);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
@@ -87,6 +91,11 @@ const ProductDetail = () => {
             {product.name}
           </h1>
           <p className="mt-6 text-2xl font-semibold text-foreground">£{product.price.toFixed(2)}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            {product.stockQuantity > 0
+              ? `${product.stockQuantity} in stock`
+              : "Out of stock"}
+          </p>
           <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground">{product.summary}</p>
 
           <div className="mt-8 space-y-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -97,14 +106,15 @@ const ProductDetail = () => {
 
           <button
             onClick={handleAddToCart}
-            className="mt-10 inline-flex w-full items-center justify-center gap-2 border border-primary bg-primary px-6 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground transition-opacity duration-200 hover:opacity-85"
+            disabled={product.stockQuantity < 1}
+            className="mt-10 inline-flex w-full items-center justify-center gap-2 border border-primary bg-primary px-6 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary-foreground transition-opacity duration-200 hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {added ? (
               <>
                 <Check className="h-4 w-4" /> Added to Cart
               </>
             ) : (
-              "Add to Cart"
+              product.stockQuantity > 0 ? "Add to Cart" : "Out of Stock"
             )}
           </button>
 

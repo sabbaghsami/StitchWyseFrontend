@@ -2,7 +2,7 @@ import { appEnv } from "../config/env";
 import { requestJson } from "./http";
 import { getProductById as getStaticProductById, products as staticProducts, type Product } from "../data/products";
 
-const PRODUCT_SELECT = "id,name,category,price,summary,featured,stripe_product_id,product_images(image_url,position)";
+const PRODUCT_SELECT = "id,name,category,price,stock_quantity,summary,featured,stripe_product_id,product_images(image_url,position)";
 
 interface ProductImageRow {
   image_url: string;
@@ -14,6 +14,7 @@ interface ProductRow {
   name: string;
   category: Product["category"];
   price: number;
+  stock_quantity: number;
   summary: string;
   featured: boolean;
   stripe_product_id: string | null;
@@ -51,6 +52,7 @@ function mapProductRow(row: ProductRow): Product {
     name: row.name,
     category: row.category,
     price: Number(row.price),
+    stockQuantity: Math.max(0, Math.floor(Number(row.stock_quantity))),
     summary: row.summary,
     images: orderedImages,
     featured: row.featured,

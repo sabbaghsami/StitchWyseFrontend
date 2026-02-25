@@ -15,7 +15,13 @@ interface ProductRow {
   id: string;
   name: string;
   active: boolean;
+  stock_quantity: number;
   stripe_product_id: string | null;
+}
+
+interface StockReservationItem {
+  product_id: string;
+  quantity: number;
 }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -89,7 +95,7 @@ function sanitizeProductId(value: string): string {
 
 async function fetchProducts(productIds: string[]): Promise<ProductRow[]> {
   const params = new URLSearchParams({
-    select: "id,name,active,stripe_product_id",
+    select: "id,name,active,stock_quantity,stripe_product_id",
     id: `in.(${productIds.join(",")})`,
   });
 
@@ -105,6 +111,61 @@ async function fetchProducts(productIds: string[]): Promise<ProductRow[]> {
   }
 
   return (await response.json()) as ProductRow[];
+}
+
+function getErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object") {
+    return fallback;
+  }
+
+  const candidatePayload = payload as Record<string, unknown>;
+  const candidateValues = [
+    candidatePayload.message,
+    candidatePayload.error,
+    candidatePayload.hint,
+    candidatePayload.details,
+  ];
+
+  for (const value of candidateValues) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return fallback;
+}
+
+async function callStockRpc(functionName: string, items: StockReservationItem[]): Promise<{ ok: true } | { ok: false; message: string }> {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+    body: JSON.stringify({ p_items: items }),
+  });
+
+  if (response.ok) {
+    return { ok: true };
+  }
+
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  const rawMessage = getErrorMessage(payload, "Unable to update stock.");
+  if (rawMessage.includes("INSUFFICIENT_STOCK")) {
+    return { ok: false, message: "One or more items are out of stock." };
+  }
+  if (rawMessage.includes("INVALID_ITEMS")) {
+    return { ok: false, message: "Invalid cart items for stock reservation." };
+  }
+
+  return { ok: false, message: rawMessage };
 }
 
 Deno.serve(async (request) => {
@@ -194,6 +255,14 @@ Deno.serve(async (request) => {
     if (!product.stripe_product_id.startsWith("prod_")) {
       return jsonResponse(400, { error: `Product ${product.name} has an invalid Stripe Product ID.` }, corsHeaders);
     }
+    if (!Number.isInteger(product.stock_quantity) || product.stock_quantity < 0) {
+      return jsonResponse(400, { error: `Product ${product.name} has invalid stock.` }, corsHeaders);
+    }
+
+    const requestedQuantity = quantityByProduct.get(productId) ?? 0;
+    if (requestedQuantity > product.stock_quantity) {
+      return jsonResponse(409, { error: `${product.name} only has ${product.stock_quantity} left in stock.` }, corsHeaders);
+    }
 
     try {
       const prices = await stripe.prices.list({
@@ -223,6 +292,16 @@ Deno.serve(async (request) => {
     quantity: quantityByProduct.get(productId) ?? 1,
   }));
 
+  const stockReservationItems: StockReservationItem[] = productIds.map((productId) => ({
+    product_id: productId,
+    quantity: quantityByProduct.get(productId) ?? 1,
+  }));
+
+  const reserveResult = await callStockRpc("reserve_product_stock", stockReservationItems);
+  if (!reserveResult.ok) {
+    return jsonResponse(409, { error: reserveResult.message }, corsHeaders);
+  }
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -234,11 +313,13 @@ Deno.serve(async (request) => {
     });
 
     if (!session.url) {
+      await callStockRpc("release_product_stock", stockReservationItems);
       return jsonResponse(500, { error: "Stripe checkout URL was not returned." }, corsHeaders);
     }
 
     return jsonResponse(200, { url: session.url }, corsHeaders);
   } catch {
+    await callStockRpc("release_product_stock", stockReservationItems);
     return jsonResponse(500, { error: "Failed to create Stripe checkout session." }, corsHeaders);
   }
 });

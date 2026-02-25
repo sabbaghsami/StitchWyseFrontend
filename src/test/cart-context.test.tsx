@@ -4,6 +4,7 @@ import { CartProvider, useCart } from "../context/CartContext";
 import { products } from "../data/products";
 
 const STORAGE_KEY = "stitchwyse.cart.v1";
+const highStockProduct = { ...products[0]!, stockQuantity: 100 };
 
 function wrapper({ children }: { children: ReactNode }) {
   return <CartProvider>{children}</CartProvider>;
@@ -53,7 +54,7 @@ describe("CartContext localStorage persistence", () => {
 
     act(() => {
       for (let index = 0; index < 25; index += 1) {
-        result.current.addToCart(products[0]!);
+        result.current.addToCart(highStockProduct);
       }
     });
 

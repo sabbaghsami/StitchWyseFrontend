@@ -1,128 +1,156 @@
-# StitchWyse - Handmade Crochet Shop
+# StitchWyse Frontend
 
-A modern e-commerce frontend for handmade crochet items built with React, TypeScript, and Tailwind CSS.
+E-commerce storefront for handmade crochet products with Supabase-backed catalog data and Stripe Checkout.
 
-## Features
+## Current Stack
 
-- Product catalog with filtering by category
-- Product detail pages with image gallery
-- Shopping cart management
-- Contact page with social media links
-- Custom orders page
-- Responsive design
-- Modern UI with smooth animations
+- Frontend: React 18, TypeScript, Vite
+- UI: Tailwind CSS, shadcn/ui, Radix UI, lucide-react
+- Routing: react-router-dom v6
+- Data source: Supabase PostgREST (`products`, `product_images`)
+- Checkout backend: Supabase Edge Function (`create-checkout-session`)
+- Payments: Stripe Checkout (server-side price resolution)
+- Testing: Vitest + Testing Library
+- Linting: ESLint
+- Deployment: Vercel (frontend) + Supabase (database/functions) + Stripe
 
-## Tech Stack
+## Architecture Notes (Important)
 
-- **Frontend**: React 18 + TypeScript
-- **Styling**: Tailwind CSS
-- **Routing**: React Router v6
-- **Build Tool**: Vite
-- **Testing**: Vitest
-- **Linting**: ESLint
-- **UI Components**: shadcn/ui
+- `public.products.stripe_product_id` must store Stripe Product IDs (`prod_...`), not Stripe Price IDs.
+- Checkout accepts cart items as `productId` + `quantity` only.
+- The edge function resolves the active Stripe Price from `stripe_product_id` server-side.
+- The frontend never sends trusted price values to Stripe.
+- Each active product should have exactly one active GBP Stripe Price.
 
-## Getting Started
+## Environment Variables
 
-### Prerequisites
-
-- Node.js 18+ or Bun
-
-### Installation
-
-```bash
-# Install dependencies
-npm install
-# or
-bun install
-```
-
-### Development
-
-```bash
-# Start dev server
-npm run dev
-# or
-bun run dev
-```
-
-Open [http://localhost:8080](http://localhost:8080) in your browser.
-
-### Supabase Configuration
-
-Set these variables in your local `.env`:
+Create a local `.env` for frontend runtime values:
 
 ```bash
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxxx
 ```
 
-When configured, product data is loaded from Supabase tables (`products`, `product_images`).
-When missing, the app falls back to static seed data in `/src/data/products.ts`.
+Optional if used by your app routes:
 
-### Stripe Checkout (Supabase Edge Function)
+```bash
+VITE_API_BASE_URL=https://api.example.com
+```
 
-- Edge function deployed: `create-checkout-session`
-- Product table must use `products.stripe_product_id` with Stripe Product IDs (for example, `prod_...`).
-- For each Stripe product, keep at least one active Stripe Price.
-- Configure Supabase Edge Function secrets:
-  - `STRIPE_SECRET_KEY`
-  - `ALLOWED_ORIGINS` (comma-separated, e.g. `https://stitchwyse.com,https://www.stitchwyse.com`)
+If Supabase vars are missing, product loading falls back to `src/data/products.ts`.
 
-For LAN testing only, run:
+## Supabase Edge Function Secrets
+
+Set these in Supabase Dashboard -> Edge Functions -> Secrets:
+
+- `STRIPE_SECRET_KEY=sk_test_...` (or `sk_live_...`)
+- `ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com`
+
+Without `STRIPE_SECRET_KEY`, checkout session creation fails.
+
+## Stripe Setup
+
+1. Create Stripe Products and keep one active GBP price per product.
+2. Sync each Supabase product row to a Stripe Product ID in `products.stripe_product_id`.
+3. Enable Stripe customer emails (receipts) in Dashboard:
+   - Settings -> Emails -> Successful payments.
+4. Configure Stripe branding (logo/colors) if needed:
+   - Settings -> Branding.
+
+### Receipt Email Behavior
+
+- Live mode: receipts send normally when enabled and customer email is present.
+- Test mode: receipts are generally not sent to arbitrary customer emails (limited Stripe test exceptions apply).
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run app:
+
+```bash
+npm run dev
+```
+
+LAN testing:
 
 ```bash
 npm run dev:lan
 ```
 
-### Building
+## Optional: Local Edge Function Testing
+
+Only required if you want to run Supabase functions locally.
+
+1. Install Supabase CLI:
 
 ```bash
-# Build for production
+brew install supabase/tap/supabase
+```
+
+2. Create local function env file:
+
+`supabase/functions/.env`
+
+```bash
+STRIPE_SECRET_KEY=sk_test_...
+ALLOWED_ORIGINS=http://localhost:5173
+```
+
+3. Serve function locally:
+
+```bash
+supabase functions serve create-checkout-session --env-file supabase/functions/.env --no-verify-jwt
+```
+
+Note: local `supabase functions serve` requires Docker. Deploying to Supabase does not.
+
+## Build, Test, Lint
+
+```bash
 npm run build
-# or
-bun run build
-```
-
-### Testing
-
-```bash
-# Run tests
 npm run test
-# or
-bun run test
+npm run lint
 ```
+
+## Deploy (Recommended)
+
+- Frontend: Vercel
+- Backend/data: Supabase
+- Payments: Stripe
+
+Required Vercel env vars:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+Required Supabase function secrets:
+
+- `STRIPE_SECRET_KEY`
+- `ALLOWED_ORIGINS` (must include your Vercel domain)
 
 ## Security Baseline
 
-- Frontend includes a restrictive Content Security Policy in `/index.html`.
-- Runtime env validation blocks invalid `VITE_API_BASE_URL` values and enforces HTTPS in production.
-- `.env` files are gitignored by default; keep secrets only in environment variables.
-- Use `requestJson` from `/src/lib/http.ts` for backend calls to get centralized handling for `400/404/500`, timeouts, bounded retries, and client-side request throttling.
-
-### Deployment Hardening Checklist
-
-- Serve the app over HTTPS only.
-- Set security headers at the edge/reverse proxy (`Content-Security-Policy`, `Referrer-Policy`, `X-Content-Type-Options`, `Strict-Transport-Security`).
-- Restrict backend CORS to your production frontend origin only.
-- Use HttpOnly, Secure, SameSite cookies for auth/session state (from backend).
-- Update CSP before enabling Stripe (`https://js.stripe.com`, Stripe API endpoints, and Stripe frame sources).
+- Keep Stripe secrets only in Supabase function secrets (never in `VITE_*`).
+- Restrict CORS with `ALLOWED_ORIGINS`.
+- Serve over HTTPS in production.
+- Use `src/lib/http.ts` `requestJson` helper for consistent timeout/retry/error handling.
 
 ## Project Structure
 
-```
+```text
 src/
-├── components/        # Reusable React components
-├── pages/            # Page components for routes
-├── context/          # React Context for state management
-├── hooks/            # Custom React hooks
-├── lib/              # Utility functions
-├── data/             # Static data and product information
-├── assets/           # Images and other static assets
-├── App.tsx           # Main app component
-└── main.tsx          # Entry point
+  components/          Reusable UI components
+  pages/               Route pages
+  context/             React context state
+  lib/                 HTTP, checkout, Supabase product utilities
+  data/                Static product fallback data
+supabase/
+  functions/
+    create-checkout-session/
+      index.ts         Stripe checkout session creator
 ```
-
-## License
-
-MIT

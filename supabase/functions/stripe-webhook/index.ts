@@ -20,7 +20,10 @@ interface OrderRow {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
-const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+const STRIPE_WEBHOOK_SECRETS = (Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -384,7 +387,7 @@ Deno.serve(async (request) => {
   if (!STRIPE_SECRET_KEY) {
     return jsonResponse(500, { error: "STRIPE_SECRET_KEY is not configured." });
   }
-  if (!STRIPE_WEBHOOK_SECRET) {
+  if (STRIPE_WEBHOOK_SECRETS.length === 0) {
     return jsonResponse(500, { error: "STRIPE_WEBHOOK_SECRET is not configured." });
   }
 
@@ -396,11 +399,20 @@ Deno.serve(async (request) => {
   const body = await request.text();
   const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
-  } catch {
-    return jsonResponse(400, { error: "Invalid webhook signature." });
+  let event: Stripe.Event | null = null;
+  for (const secret of STRIPE_WEBHOOK_SECRETS) {
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, secret);
+      break;
+    } catch {
+      // Try the next configured secret.
+    }
+  }
+
+  if (!event) {
+    return jsonResponse(400, {
+      error: "Invalid webhook signature. Check STRIPE_WEBHOOK_SECRET for this exact Stripe endpoint.",
+    });
   }
 
   try {

@@ -168,6 +168,49 @@ async function callStockRpc(functionName: string, items: StockReservationItem[])
   return { ok: false, message: rawMessage };
 }
 
+async function saveCheckoutReservation(
+  stripeSessionId: string,
+  items: StockReservationItem[],
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/checkout_stock_reservations?on_conflict=stripe_session_id`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify([
+        {
+          stripe_session_id: stripeSessionId,
+          items,
+          status: "reserved",
+          reserved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]),
+    },
+  );
+
+  if (response.ok) {
+    return { ok: true };
+  }
+
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  return {
+    ok: false,
+    message: getErrorMessage(payload, "Unable to save checkout reservation."),
+  };
+}
+
 Deno.serve(async (request) => {
   const requestOrigin = request.headers.get("origin");
   const allowedOrigins = parseAllowedOrigins();
@@ -315,6 +358,18 @@ Deno.serve(async (request) => {
     if (!session.url) {
       await callStockRpc("release_product_stock", stockReservationItems);
       return jsonResponse(500, { error: "Stripe checkout URL was not returned." }, corsHeaders);
+    }
+
+    const saveReservationResult = await saveCheckoutReservation(session.id, stockReservationItems);
+    if (!saveReservationResult.ok) {
+      await callStockRpc("release_product_stock", stockReservationItems);
+      try {
+        await stripe.checkout.sessions.expire(session.id);
+      } catch {
+        // Best effort only: stock is already released.
+      }
+
+      return jsonResponse(500, { error: saveReservationResult.message }, corsHeaders);
     }
 
     return jsonResponse(200, { url: session.url }, corsHeaders);

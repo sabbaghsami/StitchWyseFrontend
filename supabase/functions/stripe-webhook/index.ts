@@ -20,10 +20,29 @@ interface OrderRow {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
-const STRIPE_WEBHOOK_SECRETS = (Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "")
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
+
+function normalizeWebhookSecret(rawValue: string): string[] {
+  return rawValue
+    .split(/[,\n;]/g)
+    .map((value) => value.trim())
+    .map((value) => value.replace(/^['"]+|['"]+$/g, ""))
+    .filter(Boolean);
+}
+
+function getStripeWebhookSecrets(): string[] {
+  const candidates = [
+    Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "",
+    Deno.env.get("STRIPE_WEBHOOK_SECRETS") ?? "",
+    Deno.env.get("STRIPE_WEBHOOK_SECRET_TEST") ?? "",
+    Deno.env.get("STRIPE_WEBHOOK_SECRET_LIVE") ?? "",
+    Deno.env.get("STRIPE_CLI_WEBHOOK_SECRET") ?? "",
+  ];
+
+  const allSecrets = candidates.flatMap((value) => normalizeWebhookSecret(value));
+  return [...new Set(allSecrets)];
+}
+
+const STRIPE_WEBHOOK_SECRETS = getStripeWebhookSecrets();
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -400,18 +419,23 @@ Deno.serve(async (request) => {
   const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2024-06-20" });
 
   let event: Stripe.Event | null = null;
+  const verificationErrors: string[] = [];
   for (const secret of STRIPE_WEBHOOK_SECRETS) {
     try {
       event = stripe.webhooks.constructEvent(body, signature, secret);
       break;
-    } catch {
-      // Try the next configured secret.
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown signature verification error.";
+      verificationErrors.push(message);
     }
   }
 
   if (!event) {
+    const uniqueErrors = [...new Set(verificationErrors)].slice(0, 2);
     return jsonResponse(400, {
       error: "Invalid webhook signature. Check STRIPE_WEBHOOK_SECRET for this exact Stripe endpoint.",
+      details: uniqueErrors.length > 0 ? uniqueErrors : undefined,
     });
   }
 

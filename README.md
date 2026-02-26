@@ -60,6 +60,24 @@ Without `STRIPE_SECRET_KEY`, checkout session creation fails.
 5. Configure Stripe branding (logo/colors) if needed:
    - Settings -> Branding.
 
+### Stripe Webhook Setup
+
+Configure the webhook endpoint to call your deployed Supabase function URL:
+
+- `https://<your-project-ref>.supabase.co/functions/v1/stripe-webhook`
+- Subscribe to:
+  - `checkout.session.completed`
+  - `checkout.session.expired`
+
+Set webhook secrets in Supabase function secrets:
+
+- `STRIPE_WEBHOOK_SECRET=whsec_...` (Dashboard endpoint secret)
+- Optional multi-secret format for parallel sources (Dashboard + Stripe CLI):
+  - `STRIPE_WEBHOOK_SECRET=whsec_dashboard,whsec_cli`
+
+If webhook signature verification fails, Stripe endpoint logs should return `400` with
+`Invalid webhook signature` plus a short diagnostic `details` field.
+
 ### Receipt Email Behavior
 
 - Live mode: receipts send normally when enabled and customer email is present.
